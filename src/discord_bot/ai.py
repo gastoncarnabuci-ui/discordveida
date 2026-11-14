@@ -12,7 +12,7 @@ from google.genai import errors, types
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-4-hydrogen"
 MAX_OUTPUT_TOKENS = 8192
 MAX_HISTORY_MESSAGES = 10
 COOLDOWN_SECONDS = 6
@@ -40,7 +40,7 @@ def gemini_error_reply(status_code: object) -> str:
     if status in {"401", "403", "UNAUTHENTICATED", "PERMISSION_DENIED"}:
         return "Gemini rechazó la clave o sus permisos. Revisa GEMINI_API_KEY y el acceso a la API."
     if status in {"404", "NOT_FOUND"}:
-        return "Gemini no encontró el modelo o la API solicitada. Verifica el acceso a gemini-2.5-flash."
+        return "Gemini no encontró el modelo o la API solicitada. Verifica el acceso a gemini-4-hydrogen."
     return "Gemini no pudo responder. Revisa la clave y los límites de la API e inténtalo de nuevo."
 
 

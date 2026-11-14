@@ -9,7 +9,7 @@ Bot de Discord en Python que responde en español con humor seco y sarcástico. 
 - Mantiene un contexto breve separado por usuario y canal. El historial solo vive mientras el proceso está encendido.
 - Prioriza respuestas correctas y admite cuando no sabe. No tiene navegación web ni puede garantizar que cada respuesta sea correcta.
 - Evita pings involuntarios en las respuestas y limita la frecuencia de preguntas por usuario.
-- Envía la pregunta y su contexto breve a Google Gemini (`gemini-2.5-flash`) para generar la respuesta.
+- Envía la pregunta y su contexto breve a Google Gemini (`gemini-4-hydrogen`) para generar la respuesta.
 
 ## Configuración en Replit
 
