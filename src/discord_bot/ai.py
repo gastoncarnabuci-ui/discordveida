@@ -7,12 +7,13 @@ import time
 from collections import deque
 from typing import Deque
 
-from openai import APIConnectionError, APIStatusError, APITimeoutError, AsyncOpenAI, OpenAIError, RateLimitError
+from google import genai
+from google.genai import errors, types
 
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
-MAX_COMPLETION_TOKENS = 8192
+MODEL = "gemini-2.5-flash"
+MAX_OUTPUT_TOKENS = 8192
 MAX_HISTORY_MESSAGES = 10
 COOLDOWN_SECONDS = 6
 MAX_QUESTION_LENGTH = 1500
@@ -28,38 +29,34 @@ class UserCooldown(Exception):
     """Raised when a user sends questions too quickly."""
 
 
-def rate_limit_reply(code: str | None, error_type: str | None) -> str:
-    """Explain common OpenAI 429 causes without exposing provider error details."""
-    details = f"{code or ''} {error_type or ''}".lower()
-    if "quota" in details:
+def gemini_error_reply(status_code: object) -> str:
+    """Return an actionable, non-sensitive response for common Gemini API errors."""
+    status = str(status_code or "").upper()
+    if status in {"429", "RESOURCE_EXHAUSTED"}:
         return (
-            "La cuenta de OpenAI de este bot no tiene cuota disponible. "
-            "Revisa la facturación y los límites del proyecto asociado a OPENAI_API_KEY."
+            "Gemini alcanzó el límite de cuota o solicitudes de la clave configurada. "
+            "Revisa el uso y los límites del proyecto de Google asociado a GEMINI_API_KEY."
         )
-    if "rate_limit" in details:
-        return (
-            "OpenAI alcanzó el límite temporal de solicitudes o tokens. "
-            "Espera un poco y vuelve a intentarlo."
-        )
-    return (
-        "OpenAI rechazó la solicitud con un error 429. Puede ser falta de cuota "
-        "o un límite temporal; revisa la facturación y los límites de la cuenta."
-    )
+    if status in {"401", "403", "UNAUTHENTICATED", "PERMISSION_DENIED"}:
+        return "Gemini rechazó la clave o sus permisos. Revisa GEMINI_API_KEY y el acceso a la API."
+    if status in {"404", "NOT_FOUND"}:
+        return "Gemini no encontró el modelo o la API solicitada. Verifica el acceso a gemini-2.5-flash."
+    return "Gemini no pudo responder. Revisa la clave y los límites de la API e inténtalo de nuevo."
 
 
 class AnswerService:
     def __init__(self) -> None:
-        self._client: AsyncOpenAI | None = None
+        self._client: genai.Client | None = None
         self._histories: dict[tuple[int, int], Deque[dict[str, str]]] = {}
         self._last_request: dict[int, float] = {}
         self._user_locks: dict[int, asyncio.Lock] = {}
 
-    def _get_client(self) -> AsyncOpenAI:
+    def _get_client(self) -> genai.Client:
         if self._client is None:
-            api_key = os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
-                raise RuntimeError("Falta el secreto OPENAI_API_KEY.")
-            self._client = AsyncOpenAI(api_key=api_key, timeout=45.0, max_retries=2)
+                raise RuntimeError("Falta el secreto GEMINI_API_KEY.")
+            self._client = genai.Client(api_key=api_key)
         return self._client
 
     async def answer(self, user_id: int, channel_id: int, question: str) -> str:
@@ -81,41 +78,44 @@ class AnswerService:
             history = self._histories.setdefault(
                 history_key, deque(maxlen=MAX_HISTORY_MESSAGES)
             )
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *history,
-                {"role": "user", "content": question},
+            contents = [
+                types.Content(
+                    role="model" if message["role"] == "assistant" else "user",
+                    parts=[types.Part.from_text(text=message["content"])],
+                )
+                for message in history
             ]
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=question)],
+                )
+            )
 
             try:
-                response = await self._get_client().chat.completions.create(
+                response = await self._get_client().aio.models.generate_content(
                     model=MODEL,
-                    messages=messages,
-                    max_completion_tokens=MAX_COMPLETION_TOKENS,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        max_output_tokens=MAX_OUTPUT_TOKENS,
+                    ),
                 )
-            except RateLimitError as error:
-                code = getattr(error, "code", None)
-                error_type = getattr(error, "type", None)
-                logger.warning(
-                    "OpenAI returned HTTP 429 (code=%s, type=%s).",
-                    code or "unknown",
-                    error_type or "unknown",
-                )
-                return rate_limit_reply(code, error_type)
-            except (APITimeoutError, APIConnectionError):
-                logger.warning("Could not reach the OpenAI service.")
-                return "No pude conectar con el servicio de respuestas. Inténtalo otra vez en un momento."
-            except APIStatusError as error:
-                logger.warning("OpenAI request failed with status %s.", error.status_code)
-                return "El servicio de respuestas rechazó la consulta. Revisa que tu clave y el modelo configurado tengan acceso."
-            except OpenAIError as error:
-                logger.warning("OpenAI request failed (%s).", type(error).__name__)
-                return "El servicio de respuestas falló por ahora. Qué decepción: justo cuando parecía útil."
+            except errors.APIError as error:
+                status_code = getattr(error, "code", None) or getattr(error, "status", None)
+                logger.warning("Gemini API request failed (status=%s).", status_code or "unknown")
+                return gemini_error_reply(status_code)
+            except TimeoutError:
+                logger.warning("Gemini API request timed out.")
+                return "Gemini tardó demasiado en responder. Inténtalo otra vez en un momento."
             except RuntimeError:
-                logger.error("The OpenAI API key is not configured.")
-                return "Falta configurar la clave de OpenAI. Avísale a quien administra este bot."
+                logger.error("The Gemini API key is not configured.")
+                return "Falta configurar la clave de Gemini. Avísale a quien administra este bot."
+            except Exception as error:
+                logger.warning("Gemini request failed (%s).", type(error).__name__)
+                return "No pude obtener una respuesta de Gemini. Inténtalo de nuevo en un momento."
 
-            answer = response.choices[0].message.content if response.choices else None
+            answer = response.text
             if not answer or not answer.strip():
                 return "No logré producir una respuesta útil. Una pausa dramática, aparentemente."
 
@@ -126,4 +126,4 @@ class AnswerService:
 
     async def close(self) -> None:
         if self._client is not None:
-            await self._client.close()
+            await self._client.aio.aclose()

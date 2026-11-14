@@ -5,7 +5,7 @@ description = "A sarcastic Spanish-language Discord bot that answers questions w
 requires-python = ">=3.13"
 dependencies = [
     "discord-py>=2.7.1",
-    "openai>=3.51.0",
+    "google-genai>=3.3.0",
 ]
 
 [project.scripts]

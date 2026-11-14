@@ -10,13 +10,13 @@ A Python Discord bot that answers questions in Spanish with an original, dryly s
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required secrets: `DISCORD_BOT_TOKEN`, `OPENAI_API_KEY`
-- Optional env: `OPENAI_MODEL` (defaults to `gpt-5.4-mini`), `DISCORD_GUILD_ID` (for faster command registration in one test server)
+- Required secrets: `DISCORD_BOT_TOKEN`, `GEMINI_API_KEY`
+- Optional env: `DISCORD_GUILD_ID` (for faster command registration in one test server)
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- Python 3.13, `discord.py`, OpenAI Python SDK
+- Python 3.13, `discord.py`, Google `google-genai` SDK
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
@@ -45,7 +45,7 @@ _Populate as you build — non-obvious choices a reader couldn't infer from the 
 ## Gotchas
 
 - Enable the Message Content Intent in Discord's Developer Portal for mention-based replies.
-- OpenAI requests are billed to the account that owns `OPENAI_API_KEY`.
+- Gemini requests use the quota and billing associated with `GEMINI_API_KEY`.
 - Conversation context is temporary and isolated by user and channel; it resets when the bot restarts.
 
 ## Pointers
