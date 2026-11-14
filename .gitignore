@@ -53,3 +53,13 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pythonlibs/
+.env
+.env.*
+!.env.example

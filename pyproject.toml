@@ -1,10 +1,7 @@
 [project]
-name = "repl-nix-workspace"
+name = "discord-answers-bot"
 version = "0.1.0"
-description = "Add your description here"
-authors = [
-    { name = "a", email = "55267907-gastoncarnabuci@users.noreply.replit.com" }
-]
+description = "A sarcastic Spanish-language Discord bot that answers questions with care."
 requires-python = ">=3.13"
 dependencies = [
     "discord-py>=2.7.1",
@@ -12,8 +9,12 @@ dependencies = [
 ]
 
 [project.scripts]
-repl-nix-workspace = "repl_nix_workspace:main"
+discord-answers-bot = "discord_bot:main"
 
 [build-system]
 requires = ["uv_build>=0.13.4,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "discord_bot"
+module-root = "src"
