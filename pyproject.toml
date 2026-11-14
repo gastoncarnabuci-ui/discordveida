@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "A sarcastic Spanish-language Discord bot that answers questions with care."
 requires-python = ">=3.13"
 dependencies = [
-    "discord-py>=2.7.1",
+    "davey>=0.2.0",
+    "discord-py[voice]>=2.7.1",
     "google-genai>=3.3.0",
 ]
 
