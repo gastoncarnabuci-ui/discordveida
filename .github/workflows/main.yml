@@ -11,17 +11,16 @@ jobs:
       - name: Descargar el código del repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Python
-        uses: actions/setup-python@v5
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.11'
+          enable-cache: true
 
       - name: Instalar dependencias
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: uv sync
 
       - name: Iniciar el bot
         env:
-          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
-        run: python -m src.discord_bot
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: uv run python -m discord_bot
