@@ -28,6 +28,25 @@ class UserCooldown(Exception):
     """Raised when a user sends questions too quickly."""
 
 
+def rate_limit_reply(code: str | None, error_type: str | None) -> str:
+    """Explain common OpenAI 429 causes without exposing provider error details."""
+    details = f"{code or ''} {error_type or ''}".lower()
+    if "quota" in details:
+        return (
+            "La cuenta de OpenAI de este bot no tiene cuota disponible. "
+            "Revisa la facturación y los límites del proyecto asociado a OPENAI_API_KEY."
+        )
+    if "rate_limit" in details:
+        return (
+            "OpenAI alcanzó el límite temporal de solicitudes o tokens. "
+            "Espera un poco y vuelve a intentarlo."
+        )
+    return (
+        "OpenAI rechazó la solicitud con un error 429. Puede ser falta de cuota "
+        "o un límite temporal; revisa la facturación y los límites de la cuenta."
+    )
+
+
 class AnswerService:
     def __init__(self) -> None:
         self._client: AsyncOpenAI | None = None
@@ -74,9 +93,15 @@ class AnswerService:
                     messages=messages,
                     max_completion_tokens=MAX_COMPLETION_TOKENS,
                 )
-            except RateLimitError:
-                logger.warning("OpenAI rate limit reached.")
-                return "El servicio de IA está saturado por ahora. Vuelve a intentarlo en un momento; sí, hasta las máquinas tenemos fila."
+            except RateLimitError as error:
+                code = getattr(error, "code", None)
+                error_type = getattr(error, "type", None)
+                logger.warning(
+                    "OpenAI returned HTTP 429 (code=%s, type=%s).",
+                    code or "unknown",
+                    error_type or "unknown",
+                )
+                return rate_limit_reply(code, error_type)
             except (APITimeoutError, APIConnectionError):
                 logger.warning("Could not reach the OpenAI service.")
                 return "No pude conectar con el servicio de respuestas. Inténtalo otra vez en un momento."
